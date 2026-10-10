@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ParkEase – Smart Parking Management System</title>
+<style>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);--bg:#f3f8fc;--card:#fff;--tx:#12263a;--mut:#5d7186;--blue:#1565c0;--green:#2e9e5b;--red:#d64545;--grey:#aeb8c2;--bd:#d9e4ee}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0e1a26;--card:#16283a;--tx:#e8f0f8;--mut:#9fb2c5;--bd:#27405a;--blue:#4a9bf0}}
+*{box-sizing:border-box}html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;font-family:system-ui,Segoe UI,Arial,sans-serif;background:var(--bg);color:var(--tx)}
+header{background:linear-gradient(90deg,#1565c0,#2e9e5b);color:#fff;padding:12px 16px;display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between}
+.logo{font-size:1.4rem;font-weight:700;cursor:pointer}nav a{color:#fff;margin-left:14px;cursor:pointer;text-decoration:none}
+main{max-width:1000px;margin:auto;padding:16px}
+.demo{background:#fff3cd;color:#664d03;border-radius:8px;padding:8px 12px;font-size:.85rem;margin-bottom:12px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:14px}
+.cat{cursor:pointer;text-align:center;font-weight:600}.cat:hover,.loc:hover{border-color:var(--blue)}
+.cat span{display:block;font-size:2rem}.loc{cursor:pointer}
+input,select,textarea,button{font:inherit;padding:8px 10px;border-radius:8px;border:1px solid var(--bd);background:var(--card);color:var(--tx)}
+button{background:var(--blue);color:#fff;border:0;cursor:pointer}button.alt{background:var(--green)}button.ghost{background:none;color:var(--blue);border:1px solid var(--blue)}
+.row{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0;align-items:center}
+.stat b{font-size:1.5rem;display:block}.tabs button{background:var(--card);color:var(--tx);border:1px solid var(--bd)}.tabs button.on{background:var(--blue);color:#fff}
+.slots{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 16px}
+.slot{width:46px;height:56px;border-radius:6px;color:#fff;font-size:.75rem;display:flex;align-items:center;justify-content:center;border:2px solid transparent}
+.a{background:var(--green)}.o{background:var(--red)}.r{background:var(--grey)}.sel{border-color:#000}
+.leg span{display:inline-flex;align-items:center;gap:4px;margin-right:12px;font-size:.85rem}.leg i{width:14px;height:14px;border-radius:3px;display:inline-block}
+table{width:100%;border-collapse:collapse;font-size:.9rem}td,th{padding:6px;border-bottom:1px solid var(--bd);text-align:left}
+.tw{overflow-x:auto}.star{cursor:pointer;font-size:1.6rem;color:#f2b01e}.mut{color:var(--mut)}
+.hide{display:none}
+</style></head><body>
+<header><div class="logo" onclick="go('home')">🅿️ ParkEase</div>
+<input id="q" placeholder="🔍 Search locations..." oninput="search(this.value)" style="min-width:200px">
+<nav><a onclick="go('home')">Home</a><a onclick="go('locs','all')">All Locations</a></nav></header>
+<main><div class="demo">⚠️ Demo prototype: all locations, availability and reviews are <b>simulated sample data</b>. No real sensors or backend are connected, and no booking is made.</div>
+<div id="app"></div></main>
+<script>
+const CATS=[["Hospitals","🏥"],["Hotels","🏨"],["Shopping Malls","🛍️"],["Theatres","🎬"],["Concert Venues","🎤"],["Other Public","🅿️"]];
+const LOCS=[
+{id:1,n:"Kauvery Hospital (Demo)",c:"Hospitals",rate:30,rule:"First 30 min free for patients; ₹30/hour after. Max ₹200/day."},
+{id:2,n:"City General Hospital (Demo)",c:"Hospitals",rate:25,rule:"₹25/hour. Ambulance bays are free."},
+{id:3,n:"Grand Palm Hotel (Demo)",c:"Hotels",rate:50,rule:"₹50/hour. Free for hotel guests."},
+{id:4,n:"Sea View Inn (Demo)",c:"Hotels",rate:40,rule:"₹40/hour, night rate flat ₹150."},
+{id:5,n:"Phoenix Marketcity Mall (Demo)",c:"Shopping Malls",rate:40,rule:"₹40/hour. Weekend surcharge ₹10/hour."},
+{id:6,n:"Central Plaza Mall (Demo)",c:"Shopping Malls",rate:35,rule:"₹35/hour. Free for first 15 minutes."},
+{id:7,n:"Star Cinema Theatre (Demo)",c:"Theatres",rate:20,rule:"₹20/hour. Show ticket holders get 50% off."},
+{id:8,n:"Rose Multiplex (Demo)",c:"Theatres",rate:30,rule:"₹30/hour."},
+{id:9,n:"Marina Arena Concert Parking (Demo)",c:"Concert Venues",rate:80,rule:"Event day flat ₹80/hour. Book early."},
+{id:10,n:"Open Air Stage Parking (Demo)",c:"Concert Venues",rate:60,rule:"₹60/hour on event days."},
+{id:11,n:"Beach Road Public Parking (Demo)",c:"Other Public",rate:15,rule:"₹15/hour. Open 6 AM–10 PM."},
+{id:12,n:"Railway Station Parking (Demo)",c:"Other Public",rate:20,rule:"₹20/hour, ₹100 per day."}];
+const SEED=[["Block A","Level 1",16],["Block B","Level 1",12],["Block C","Level 2",14]];
+const S={view:"home",loc:null,tab:"slots",sel:null,hist:[],cat:"all",text:""};
+const D={};// per-location demo state
+function rnd(s){s=Math.sin(s)*10000;return s-Math.floor(s)}
+function data(l){if(D[l.id])return D[l.id];
+ const z=SEED.map(([b,lv,n],zi)=>({b,lv,s:Array.from({length:n},(_,i)=>{const r=rnd(l.id*31+zi*7+i);return r<.5?"o":r<.62?"r":"a"})}));
+ return D[l.id]={z,upd:new Date(),log:[["10:02 AM","Entry","Vehicle #V101 (demo)","—"],["10:41 AM","Exit","Vehicle #V087 (demo)","1 h 15 min"],["11:05 AM","Entry","Vehicle #V102 (demo)","—"]]}}
+function cnt(l){let t=0,a=0,o=0,r=0;data(l).z.forEach(z=>z.s.forEach(x=>{t++;x=="a"?a++:x=="o"?o++:r++}));return{t,a,o,r}}
+function go(v,x){S.hist.push([S.view,S.loc,S.cat]);if(v=="home"){S.hist=[]}
+ if(v=="locs"){S.cat=x;S.text=""}if(v=="detail"){S.loc=x;S.tab="slots";S.sel=null}S.view=v;render()}
+function back(){const h=S.hist.pop();if(h){S.view=h[0];S.loc=h[1];S.cat=h[2]}else S.view="home";render()}
+function search(v){S.text=v.toLowerCase();if(S.view!="locs"){S.cat="all";S.view="locs"}render()}
+function render(){const a=document.getElementById("app");
+ if(S.view=="home")a.innerHTML=`<h2>Find parking easily</h2><p class="mut">Select a category to see parking locations, availability and prices.</p>
+ <div class="grid">${CATS.map(c=>`<div class="card cat" onclick="go('locs','${c[0]}')"><span>${c[1]}</span>${c[0]}</div>`).join("")}</div>
+ <h3>Dashboard summary (demo)</h3><div class="grid">${sum()}</div>`;
+ else if(S.view=="locs"){const L=LOCS.filter(l=>(S.cat=="all"||l.c==S.cat)&&l.n.toLowerCase().includes(S.text));
+ a.innerHTML=`<button class="ghost" onclick="back()">← Back</button><h2>${S.cat=="all"?"All Locations":S.cat}</h2>
+ <div class="row"><select onchange="S.cat=this.value;render()"><option value="all">All categories</option>${CATS.map(c=>`<option ${S.cat==c[0]?"selected":""}>${c[0]}</option>`).join("")}</select></div>
+ ${L.length?`<div class="grid">${L.map(l=>{const c=cnt(l);return`<div class="card loc" onclick="go('detail',${l.id})"><b>${l.n}</b><div class="mut">${l.c}</div><p>🟢 ${c.a} free of ${c.t}<br>₹${l.rate}/hour<br>⭐ ${avg(l).toFixed(1)}</p></div>`}).join("")}</div>`:`<p>No locations found. Try another search or category.</p>`}`}
+ else detail(a)}
+function sum(){let t=0,a=0;LOCS.forEach(l=>{const c=cnt(l);t+=c.t;a+=c.a});return[["Locations",LOCS.length],["Total spaces",t],["Available",a],["Occupied/Reserved",t-a]].map(x=>`<div class="card stat"><b>${x[1]}</b>${x[0]}</div>`).join("")}
+function detail(a){const l=LOCS.find(x=>x.id==S.loc),c=cnt(l),d=data(l);
+ a.innerHTML=`<button class="ghost" onclick="back()">← Back</button><h2>${l.n}</h2>
+ <div class="grid"><div class="card stat"><b>${c.t}</b>Total</div><div class="card stat"><b style="color:var(--green)">${c.a}</b>Available</div><div class="card stat"><b style="color:var(--red)">${c.o}</b>Occupied</div><div class="card stat"><b>${c.r}</b>Reserved/Unavailable</div></div>
+ <p class="mut">Last updated (demo): ${d.upd.toLocaleTimeString()}</p>
+ <div class="row tabs">${[["slots","🅿️ Slots"],["price","💰 Price"],["rev","⭐ Reviews"]].map(t=>`<button class="${S.tab==t[0]?"on":""}" onclick="S.tab='${t[0]}';render()">${t[1]}</button>`).join("")}</div>
+ <div id="tab"></div>`;
+ document.getElementById("tab").innerHTML=({slots,price,rev})[S.tab](l,d,c)}
+function slots(l,d,c){return`<div class="leg"><span><i style="background:var(--green)"></i>Available</span><span><i style="background:var(--red)"></i>Occupied</span><span><i style="background:var(--grey)"></i>Reserved</span></div>
+ ${c.a==0?`<div class="demo">😕 No parking spaces are available right now. Try another location.</div>`:""}
+ ${d.z.map((z,zi)=>`<h4>${z.b} – ${z.lv}</h4><div class="slots">${z.s.map((x,i)=>`<div class="slot ${x}" title="${x}">${z.b.slice(-1)}${i+1}</div>`).join("")}</div>`).join("")}`}
+function price(l){return`<div class="card"><h3>₹${l.rate} per hour</h3><p>${l.rule}</p>
+ <div class="row"><label>Hours: <input id="hrs" type="number" min="1" max="24" value="3" oninput="calc(${l.rate})" style="width:80px"></label></div>
+ <h2 id="fee">Estimated fee: ₹${l.rate*3}</h2><p class="mut">Simple estimate = hourly rate × hours. Discounts above are examples only.</p></div>`}
+function calc(r){const h=parseFloat(document.getElementById("hrs").value);document.getElementById("fee").textContent=h>0?"Estimated fee: ₹"+(h*r):"Enter a valid number of hours"}
+const SAMPLE=[{u:"Demo user A",r:4,t:"Clean and well lit.",demo:1},{u:"Demo user B",r:5,t:"Easy to find a slot, good safety.",demo:1},{u:"Demo user C",r:3,t:"Gets full at weekends.",demo:1}];
+function load(l){try{return JSON.parse(localStorage.getItem("pe"+l.id))||[]}catch(e){return U[l.id]||[]}}
+const U={};
+function save(l,a){U[l.id]=a;try{localStorage.setItem("pe"+l.id,JSON.stringify(a))}catch(e){}}
+function all(l){return SAMPLE.concat(load(l))}
+function avg(l){const a=all(l);return a.reduce((s,x)=>s+x.r,0)/a.length}
+let stars=0;
+function rev(l){const a=all(l);stars=0;const o=[1,2,3,4,5].map(n=>`<option>${n}</option>`).join("");
+ return`<div class="card"><h3>⭐ ${avg(l).toFixed(1)} / 5 <span class="mut">(${a.length} reviews)</span></h3>
+ ${a.map(x=>`<p><b>${"★".repeat(x.r)}${"☆".repeat(5-x.r)}</b> ${x.t}<br><small class="mut">${x.u}${x.demo?" – DEMO sample review":""}${x.f?" · Clean "+x.f[0]+" Safe "+x.f[1]+" Access "+x.f[2]+" Avail "+x.f[3]:""}</small></p>`).join("")}</div>
+ <div class="card"><h3>Submit your rating</h3><div id="st">${[1,2,3,4,5].map(n=>`<span class="star" onclick="setStar(${n})">☆</span>`).join("")}</div>
+ <div class="row">${["Cleanliness","Safety","Accessibility","Availability"].map((f,i)=>`<label>${f} <select id="f${i}">${o}</select></label>`).join("")}</div>
+ <textarea id="txt" rows="2" style="width:100%" placeholder="Your feedback..."></textarea>
+ <div class="row"><button onclick="submitR()">Submit</button></div></div>`}
+function setStar(n){stars=n;document.querySelectorAll("#st .star").forEach((e,i)=>e.textContent=i<n?"★":"☆")}
+function submitR(){const l=LOCS.find(x=>x.id==S.loc);if(!stars){alert("Please choose a star rating first.");return}
+ const a=load(l);a.push({u:"You",r:stars,t:document.getElementById("txt").value||"(no comment)",f:[0,1,2,3].map(i=>document.getElementById("f"+i).value)});save(l,a);render()}
+render();
+</script></body></html>
